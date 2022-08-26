@@ -13,6 +13,7 @@ Keep a healthy work-life balance by scheduling your work apps to only start with
 
 - Delay autostart in the morning (e.g. if you start your computer before work).
 - Sync with Google Calendar to respect your vacations.
+- macOS support (scheduled jobs require Windows PowerShell 5 or lower)
 
 ## Usage
 
