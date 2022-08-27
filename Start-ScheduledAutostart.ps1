@@ -1,41 +1,97 @@
+########################################################################################################################
+#
+# Start-ScheduledAutostart.ps1
+#
+# Keep a healthy work-life balance by scheduling your work apps to only start within your working hours and not on your
+# days off.
+#
+# MIT License
+# Copyright (c) 2022 biosmanager
+#
+# GitHub: https://github.com/biosmanager/scheduled-autostart
+# Gist: https://gist.github.com/biosmanager/7ad461508f80feb16f02d75619c35b95
+#
+########################################################################################################################
+
+### Params
+
 param (
-    $StartTime = '06:00',
+    $StartTime = '08:00',
     $EndTime = '17:00',
     $DaysOff = @('Saturday', 'Sunday'),
-    $Programs = @('C:\Users\biosmanager\AppData\Local\slack\slack.exe', 'C:\Users\biosmanager\AppData\Local\Programs\mattermost-desktop\Mattermost.exe'),
-    [switch]$ScheduleStop = $True,
-    [switch]$ScheduleRestart = $False
+    $Programs = @('<PATH TO AUTOSTART APPLICATION 1>', '<PATH TO AUTOSTART APPLICATION 1>'),
+    [switch]$DelayStart,
+    [switch]$ScheduleStop,
+    [switch]$ScheduleRestart
 )
+
+### Imports
 
 Import-Module PSScheduledJob
 
+### Jobs
+
+$DelayStartJobName = 'ScheduledAutostart-DelayAutostartApplicationsUntilWorkingDay'
+$StopJobName = 'ScheduledAutostart-StopAutostartApplicationsAfterEndOfWorkingDay'
+$RestartJobName = 'ScheduledAutostart-RestartAutostartApplicationsOnNewWorkingDay'
+Unregister-ScheduledJob -Name $DelayStartJobName -Confirm:$False -Force -ErrorAction SilentlyContinue
+Unregister-ScheduledJob -Name $StopJobName -Confirm:$False -Force -ErrorAction SilentlyContinue
+Unregister-ScheduledJob -Name $RestartJobName -Confirm:$False -Force -ErrorAction SilentlyContinue
+
+### Functions
+
 function Start-AutostartApplications {
-    foreach ($Program in $Programs) {
-        Start-Process $Program -RedirectStandardOutput nul
-    }
-}
-
-function Stop-AutostartApplications {
-    foreach ($Program in %Programs) {
-        Get-Process | Where-Object { $_.Path -like $Program } | Stop-Process
-    }
-}
-
-function Start-ScheduledAutostartApplications {
     $StartTimeDate = Get-Date $StartTime
     $EndTimeDate = Get-Date $EndTime
     $Date = Get-Date
     
     if ($Date.DayOfWeek -notin $DaysOff -and (($Date.TimeOfDay -ge $StartTimeDate.TimeOfDay) -and ($Date.TimeOfDay -le $EndTimeDate.TimeOfDay))) {
-        # Autostart
-        Write-Output 'Another day, another dollar!'
+        Write-Output 'Another day, another dollar! Starting autostart applications...'
     
-        Start-AutostartApplications
+        foreach ($Program in $Programs) {
+            Start-Process $Program -RedirectStandardOutput nul
+        }
+
+        return $True
     }
     else {
         Write-Output 'Enjoy your freetime :)'
+
+        if ($DelayStart) {
+            if (($null -eq $IsWindows) -or $IsWindows) {
+                if ($PSVersionTable.PSVersion.Major -le 5) {
+                    Write-Output 'Delaying autostart until beginning of next working day...'            
+                    $DelayStartTime = Get-Date $StartTime
+                    $DelayStartJobTrigger = New-JobTrigger -Daily -At $DelayStartTime
+                    Register-ScheduledJob -Name $DelayStartJobName -Trigger $DelayStartJobTrigger -ScriptBlock {
+                        if (Start-AutostartApplications) {
+                            Unregister-ScheduledJob -Name $DelayStartJobName -Confirm:$False -Force -ErrorAction SilentlyContinue
+                        }
+                    }
+                }
+                else {
+                    Write-Warning 'Job scheduler only works in Windows PowerShell 5 and below!'
+                }
+            }
+            else {
+                Write-Warning 'Job scheduler only works on Windows!'
+            }
+        }
+
+        return $False
     }
 }
+
+function Stop-AutostartApplications {
+    $Date = Get-Date
+    if ($Date.DayOfWeek -notin $DaysOff -and $Date.TimeOfDay -ge $EndTimeDate.TimeOfDay) {
+        foreach ($Program in %Programs) {
+            Get-Process | Where-Object { $_.Path -like $Program } | Stop-Process
+        }
+    }
+}
+
+### Script
 
 Start-ScheduledAutostartApplications
 
@@ -43,34 +99,23 @@ if (($null -eq $IsWindows) -or $IsWindows) {
     if ($PSVersionTable.PSVersion.Major -le 5) {
         # Schedule job to reduce work distractions if the computer is still on
         if ($ScheduleStop) {
-            $StateChangeTrigger = Get-CimClass `
-                -Namespace ROOT\Microsoft\Windows\TaskScheduler `
-                -ClassName MSFT_TaskSessionStateChangeTrigger
-            $OnUnlockTrigger = New-CimInstance `
-                -CimClass $StateChangeTrigger `
-                -Property @{
-                StateChange = 8  # TASK_SESSION_STATE_CHANGE_TYPE.TASK_SESSION_UNLOCK (taskschd.h)
-            } ` -ClientOnly
-        
-            $StopJobName = 'ScheduledAutostart-StopAutostartApplicationsAfterEndOfWorkingDay'
-            Register-ScheduledJob -Name $StopJobName -ScriptBlock {
-                $Date = Get-Date
-                if ($Date.DayOfWeek -notin $DaysOff -and $Date.TimeOfDay -ge $EndTimeDate.TimeOfDay) {
-                    Stop-AutostartApplications
-                }
+            Write-Output 'Scheduling stopping of autostart applications...'      
+            
+            $StopTimeDate = Get-Date $EndTime
+            $StopJobTrigger = New-JobTrigger -Daily -At $StopTimeDate
+            Register-ScheduledJob -Name $StopJobName -Trigger $StopJobTrigger -ScriptBlock {
+                Stop-AutostartApplications
             }
-
-            $Task = Get-ScheduledTask -TaskPath "\Microsoft\Windows\PowerShell\ScheduledJobs\" -TaskName $StopJobName
-            $Task | Set-ScheduledTask -Trigger $OnUnlockTrigger
         }
        
+        # Restart autostart applications on the next working day if the computer is still on
         if ($ScheduleRestart) {
-            # Restart autostart applications on the next working day if the computer is still on
-            $RestartJobName = 'ScheduledAutostart-RestartAutostartApplicationsOnNewWorkingDay'
+            Write-Output 'Scheduling restart of autostart applications...'
+            
             $RestartTimeDate = Get-Date $StartTime
             $RestartJobTrigger = New-JobTrigger -Daily -At $RestartTimeDate
             Register-ScheduledJob -Name $RestartJobName -Trigger $RestartJobTrigger -ScriptBlock {
-                Start-ScheduledAutostartApplications
+                Start-AutostartApplications
             }
         }
     }
