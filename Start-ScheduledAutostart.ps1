@@ -16,10 +16,10 @@
 ### Params
 
 param (
-    $StartTime = '08:00',
+    $StartTime = '07:00',
     $EndTime = '17:00',
     $DaysOff = @('Saturday', 'Sunday'),
-    $Programs = @('<PATH TO AUTOSTART APPLICATION 1>', '<PATH TO AUTOSTART APPLICATION 1>'),
+    $Programs = @("C:\Program Files\WindowsApps\Microsoft.WindowsNotepad_11.2206.17.0_x64__8wekyb3d8bbwe\Notepad\Notepad.exe"),
     [switch]$DelayStart,
     [switch]$ScheduleStop,
     [switch]$ScheduleRestart
@@ -93,7 +93,7 @@ function Stop-AutostartApplications {
 
 ### Script
 
-Start-ScheduledAutostartApplications
+Start-AutostartApplications | Out-Null
 
 if (($null -eq $IsWindows) -or $IsWindows) {
     if ($PSVersionTable.PSVersion.Major -le 5) {
