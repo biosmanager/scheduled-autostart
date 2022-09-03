@@ -9,12 +9,10 @@ Keep a healthy work-life balance by scheduling your work apps to only start with
 - (Optional) Delay autostart to the beginning of your working day (e.g. if you start your computer before work).
 - (Optional) Stop work apps after your working hours (triggers at desktop unlock).
 - (Optional) Restart work apps on the next work day (e.g. if you leave your computer on at night). 
+- Sync with Google Calendar to respect your vacations.- Sync with Google Calendar to respect your vacations.
 
-### Planned features
-
-- Sync with Google Calendar to respect your vacations.
-- macOS support (scheduled jobs require Windows PowerShell 5 or lower)
+Tested on Windows and macOS.
 
 ## Usage
 
-Create a task in Windows task scheduler, triggering at logon, running with highest privileges (necessary to create scheduled jobs).
+Create a task in Windows task scheduler or macOS Automator/Shortcuts, triggering at logon, running with highest privileges (necessary to create scheduled jobs).
