@@ -1,4 +1,6 @@
 import argparse
+import asyncio
+import easygui
 import calendar
 import datetime
 import os
@@ -7,6 +9,7 @@ import schedule
 import subprocess
 import time
 import psutil
+import tkinter as tk
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -23,11 +26,11 @@ parser.add_argument('--days-off', help='Days off', required=False, nargs='*')
 parser.add_argument('--programs', help='Programs', required=True, nargs='+')
 parser.add_argument('--delay-start', help='Delay start', action='store_true')
 parser.add_argument('--schedule-stop', help='Schedule stop', action='store_true')
+parser.add_argument('--force-stop', help='Force stop without confirmation', action='store_true')
 parser.add_argument('--schedule-restart', help='Schedule start', action='store_true')
 parser.add_argument('--calendar-id', help='Calendar ID', required=False)
 parser.add_argument('--vacation-keywords', help='Vacation keywords', required=False, nargs='+')
-# args = parser.parse_args()
-args = parser.parse_args("--start-time 08:00 --end-time 17:00 --days-off Sunday --programs /Applications/Slack.app --delay-start --schedule-stop --schedule-restart --calendar-id 8j65tibfa93q3c60itt4irb49o@group.calendar.google.com --vacation-keywords Matthias Urlaub".split())
+args = parser.parse_args()
 
 first_start = True
 start_time = dateutil.parser.parse(args.start_time)
@@ -114,13 +117,28 @@ def stop_programs():
     print("Stopping scheduled autostart programs...")
     date = datetime.datetime.now()
     weekday_str = calendar.day_name[date.weekday()]
-    if (weekday_str not in args.days_off) and (date.time() >= start_time.time()):
+
+    stop = True
+    if not args.force_stop:
+        msg = 'Do you want to kill all scheduled autostart applications?\nThis will stop all the following application. Please make sure you have saved all your work before proceeding.\n\n'
+
         for program in args.programs:
-            processes = [p for p in psutil.process_iter() if p.exe() == program]
-            for process in processes:
-                process.kill()
+            msg += f"- {program}\n"
+
+        stop = easygui.ynbox(msg, 'Stop scheduled autostart programs?', ('Yes', 'No'))
+
+    if stop and (weekday_str not in args.days_off) and (date.time() >= end_time.time()):
+        for process in psutil.process_iter():
+            try:
+                for program in args.programs:
+                    if program in process.exe():
+                        print(f"Stopping program: {process.exe()}")
+                        process.kill()
+            except:
+                pass
 
 start_programs()
+stop_programs()
 
 if (args.schedule_restart):
     print(f"Scheduling autostart restart every day at {args.start_time}.")
